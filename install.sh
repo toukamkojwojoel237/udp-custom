@@ -17,37 +17,29 @@ sudo touch /etc/UDPCustom/udp-custom
 udp_dir='/etc/UDPCustom'
 udp_file='/etc/UDPCustom/udp-custom'
 
-# Installation des dépendances (Ajout de python3 et pip pour le Bot)
+# Installation des dépendances (Python pour le Bot inclus)
 sudo apt update -y
 sudo apt upgrade -y
-sudo apt install -y wget curl dos2unix neofetch python3 python3-pip at
+sudo apt install -y wget curl dos2unix neofetch python3 python3-pip at net-tools
 
-# === LIEN VERS TON REPOSIT (JOEL DATA) ===
+# === TON REPOSIT ===
 REPO="https://raw.githubusercontent.com/toukamkojwojoel237/udp-custom/main"
 
-# Chargement du module depuis ton repo
 source <(curl -sSL "$REPO/module/module")
 
-# Check Ubuntu version
 if [ "$(lsb_release -rs)" = "8*|9*|10*|11*|16.04*|18.04*" ]; then
   clear
   print_center -ama -e "\e[1m\e[31m=====================================================\e[0m"
   print_center -ama -e "\e[1m\e[33mOS Incompatible\e[0m"
-  print_center -ama -e "\e[1m\e[33mUse Ubuntu 20 or higher\e[0m"
+  print_center -ama -e "\e[1m\e[33mUse Ubuntu 20+\e[0m"
   print_center -ama -e "\e[1m\e[31m=====================================================\e[0m"
   rm /home/ubuntu/install.sh
   exit 1
 else
   clear
   echo ""
-  print_center -ama "A Compatible OS/Environment Found"
+  print_center -ama "Environment Found"
   print_center -ama " ⇢ Installation begins...! <"
-  sleep 3
-
-  # [change timezone to UTC +0]
-  echo ""
-  echo " ⇢ JOEL DATA OFFICIAL SCRIPT"
-  echo " ⇢ UDP Custom Pro"
   sleep 3
 
   # [+clean up+]
@@ -56,16 +48,14 @@ else
   rm -rf /usr/bin/udp &>/dev/null
   systemctl stop udp-custom &>/dev/null
 
-  # [+get files FROM YOUR REPO ⇣⇣⇣+]
+  # [+get files+]
   source <(curl -sSL "$REPO/module/module") &>/dev/null
   wget -O /etc/UDPCustom/module "$REPO/module/module" &>/dev/null
   chmod +x /etc/UDPCustom/module
 
-  # Téléchargement du binaire UDP
   wget "$REPO/bin/udp-custom-linux-amd64" -O /root/udp/udp-custom &>/dev/null
   chmod +x /root/udp/udp-custom
 
-  # Limiter & Gateway
   wget -O /etc/limiter.sh "$REPO/module/limiter.sh"
   cp /etc/limiter.sh /etc/UDPCustom
   chmod +x /etc/limiter.sh
@@ -95,7 +85,7 @@ else
   wget "$REPO/config/config.json" -O /root/udp/config.json &>/dev/null
   chmod +x /root/udp/config.json
 
-  # [+menu (TON FICHIER MODIFIÉ)]
+  # [+menu+]
   wget -O /usr/bin/udp "$REPO/module/udp" 
   chmod +x /usr/bin/udp
   
@@ -104,12 +94,8 @@ else
   apt remove netfilter-persistent -y
   clear
   echo ""
-  echo ""
-  print_center -ama "${a103:-setting up, please wait...}"
-  sleep 6
-  title "${a102:-Installation Successful}"
-  print_center -ama "${a103:-  To show menu type: \nudp\n}"
+  print_center -ama "Installation Successful"
+  print_center -ama "Tapez: udp"
   echo -ne "\n\033[1;31mENTER \033[1;33mpour entrer au \033[1;32mMENU!\033[0m"; read
   udp
-  
 fi
