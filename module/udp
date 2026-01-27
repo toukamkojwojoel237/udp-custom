@@ -1,39 +1,44 @@
 #!/bin/bash
 
-# Charge les couleurs et fonctions de base
+# Chargement du module graphique
 source /etc/UDPCustom/module
 
-# Configuration Admin
+# Configuration
 ADMIN_CONTACT="t.me/joeldata237"
 VERIFY_URL="http://76.13.8.245:5000/verify"
 LICENSE_FILE="/etc/udp_pro_active"
 
 # ==================================================
-#            FONCTIONS DE BASE (EXISTANTES)
+#            FONCTIONS DE BASE (RESTYLÉES)
 # ==================================================
 
 add_user() {
     title "CREATE USER UDP"
     print_center -ama "Create User UDP Custom"
     msg -bar
-    msg -ne "Username: " && read user
-    # Check if user exists
+    msg -ne " Username: " && read user
     if getent passwd $user > /dev/null 2>&1; then
         print_center -verm "User $user already exists"
         enter
         return
     fi
-    msg -ne "Password: " && read pass
-    msg -ne "Days Duration: " && read days
+    msg -ne " Password: " && read pass
+    msg -ne " Days Duration: " && read days
     
     useradd -M -s /bin/false -e $(date -d "+$days days" +%Y-%m-%d) $user
     echo "$user:$pass" | chpasswd
     
+    # LE BEAU DÉCOR AVEC LE PORT
+    clear
+    msg -bar
     print_center -verd "User Created Successfully"
     msg -bar
-    msg -ama " Username: $user"
-    msg -ama " Password: $pass"
-    msg -ama " Expire: $(date -d "+$days days" +%Y-%m-%d)"
+    msg -ama " 👤 Username  : $user"
+    msg -ama " 🔑 Password  : $pass"
+    msg -ama " 🛡️ Port UDP  : 1-65535"
+    msg -ama " 📅 Expiry    : $(date -d "+$days days" +%Y-%m-%d)"
+    msg -ama " 🚀 Tunneleur : UDP Custom / HTTP Custom"
+    msg -bar
     enter
 }
 
@@ -41,17 +46,22 @@ renew_user() {
     title "RENEW USER UDP"
     print_center -ama "Renew User UDP Custom"
     msg -bar
-    msg -ne "Username: " && read user
-    # Check if user exists
+    msg -ne " Username: " && read user
     if ! getent passwd $user > /dev/null 2>&1; then
         print_center -verm "User $user not found"
         enter
         return
     fi
-    msg -ne "Days to add: " && read days
+    msg -ne " Days to add: " && read days
     chage -E $(date -d "+$days days" +%Y-%m-%d) $user
+    
+    clear
+    msg -bar
     print_center -verd "User Renewed Successfully"
-    msg -ama " New Expiration: $(chage -l $user | grep 'Account expires' | cut -d: -f2)"
+    msg -bar
+    msg -ama " 👤 Username  : $user"
+    msg -ama " 📅 New Expiry: $(chage -l $user | grep 'Account expires' | cut -d: -f2)"
+    msg -bar
     enter
 }
 
@@ -59,14 +69,16 @@ remove_user() {
     title "REMOVE USER UDP"
     print_center -ama "Remove User UDP Custom"
     msg -bar
-    msg -ne "Username: " && read user
+    msg -ne " Username: " && read user
     if ! getent passwd $user > /dev/null 2>&1; then
         print_center -verm "User $user not found"
         enter
         return
     fi
     userdel -f $user
-    print_center -verd "User $user Removed"
+    msg -bar
+    print_center -verd "User $user Removed Successfully"
+    msg -bar
     enter
 }
 
@@ -88,65 +100,171 @@ list_users() {
 #            NOUVELLES FONCTIONS PRO+
 # ==================================================
 
-# 1. BOT TELEGRAM MANAGER
+# 1. BOT TELEGRAM MANAGER (10 COMMANDES)
 install_bot_pro() {
   title "🤖 INSTALLATION BOT TELEGRAM"
-  msg -azu " Cette option va connecter votre VPS à Telegram."
+  msg -azu " Installation du Bot de Gestion Complet (10 Fonctions)."
   msg -bar
-  msg -ne " Entrez le Token Bot (BotFather): " && read token
-  msg -ne " Entrez votre ID Admin: " && read admin_id
+  msg -ne " Token Bot (BotFather): " && read token
+  msg -ne " ID Admin Telegram: " && read admin_id
   
-  msg -verd " Installation des dépendances Python..."
+  msg -verd " Installation des dépendances..."
   apt-get install python3-pip -y > /dev/null 2>&1
   pip3 install pyTelegramBotAPI > /dev/null 2>&1
 
-  # Création du script Python (généré dynamiquement)
+  # Création du script Python Bot (Code Complet)
   cat <<EOF > /etc/UDPCustom/udp_bot.py
 import telebot
 from telebot import types
 import os
 import subprocess
+import random
+import string
+import datetime
 
-bot = telebot.TeleBot("$token")
+TOKEN = "$token"
 ADMIN_ID = $admin_id
+bot = telebot.TeleBot(TOKEN)
 
+# --- MENU PRINCIPAL ---
 @bot.message_handler(commands=['start', 'menu'])
 def menu(message):
     if message.chat.id != ADMIN_ID: return
     markup = types.InlineKeyboardMarkup(row_width=2)
-    b1 = types.InlineKeyboardButton("👥 Créer User", callback_data='add')
-    b2 = types.InlineKeyboardButton("🗑 Supprimer", callback_data='del')
-    b3 = types.InlineKeyboardButton("📋 Liste", callback_data='list')
-    b4 = types.InlineKeyboardButton("📞 Contact", url="https://t.me/joeldata237")
-    markup.add(b1, b2, b3, b4)
-    bot.reply_to(message, "🔰 **MENU UDP MANAGER** 🔰", reply_markup=markup, parse_mode='Markdown')
+    
+    # LES 10 BOUTONS CORRESPONDANT AU SCRIPT
+    b1 = types.InlineKeyboardButton("1️⃣ Créer User", callback_data='add')
+    b2 = types.InlineKeyboardButton("2️⃣ Supprimer", callback_data='del')
+    b3 = types.InlineKeyboardButton("3️⃣ Renouveler", callback_data='renew')
+    b4 = types.InlineKeyboardButton("4️⃣ Liste Users", callback_data='list')
+    b5 = types.InlineKeyboardButton("5️⃣ Info VPS", callback_data='info')
+    b6 = types.InlineKeyboardButton("6️⃣ Modifier (Edit)", callback_data='edit')
+    b7 = types.InlineKeyboardButton("7️⃣ Trial (Test)", callback_data='trial')
+    b8 = types.InlineKeyboardButton("8️⃣ Users Online", callback_data='online')
+    b9 = types.InlineKeyboardButton("9️⃣ Aide/Contact", url="https://t.me/joeldata237")
+    
+    markup.add(b1, b2, b3, b4, b5, b6, b7, b8, b9)
+    bot.reply_to(message, "🔰 **PANEL UDP MANAGER PRO+** 🔰\nSélectionnez une action :", reply_markup=markup, parse_mode='Markdown')
 
+# --- CALLBACKS ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback(call):
+    # 4. LISTE
     if call.data == 'list':
         users = subprocess.getoutput("awk -F: '\$3>=1000 {print \$1}' /etc/passwd")
-        bot.send_message(call.message.chat.id, f"Users:\n{users}")
-    if call.data == 'add':
-        msg = bot.send_message(call.message.chat.id, "Envoyez: USER PASS JOURS")
-        bot.register_next_step_handler(msg, new_user)
-    if call.data == 'del':
-        msg = bot.send_message(call.message.chat.id, "Envoyez le USERNAME à supprimer")
-        bot.register_next_step_handler(msg, del_user)
+        bot.send_message(call.message.chat.id, f"📂 **UTILISATEURS :**\n{users}", parse_mode='Markdown')
+    
+    # 5. INFO
+    elif call.data == 'info':
+        ip = subprocess.getoutput("curl -s ipv4.icanhazip.com")
+        ram = subprocess.getoutput("free -m | awk 'NR==2{printf \"%.2f%%\", \$3*100/\$2 }'")
+        bot.send_message(call.message.chat.id, f"🖥 **VPS INFO**\nIP: {ip}\nRAM: {ram}", parse_mode='Markdown')
+        
+    # 8. ONLINE USERS (Chiffre simple)
+    elif call.data == 'online':
+        # Compte les lignes netstat liées à udp-custom
+        count = subprocess.getoutput("netstat -nulp | grep udp-custom | wc -l")
+        bot.send_message(call.message.chat.id, f"🟢 **En Ligne :** {count}", parse_mode='Markdown')
 
+    # 1. ADD USER
+    elif call.data == 'add':
+        msg = bot.send_message(call.message.chat.id, "Envoyez: `USER PASS JOURS`\nEx: `joel 123 30`", parse_mode='Markdown')
+        bot.register_next_step_handler(msg, new_user)
+        
+    # 2. DEL USER
+    elif call.data == 'del':
+        msg = bot.send_message(call.message.chat.id, "Envoyez le `USERNAME` à supprimer :", parse_mode='Markdown')
+        bot.register_next_step_handler(msg, del_user)
+        
+    # 3. RENEW
+    elif call.data == 'renew':
+        msg = bot.send_message(call.message.chat.id, "Envoyez: `USER JOURS_PLUS`\nEx: `joel 10`", parse_mode='Markdown')
+        bot.register_next_step_handler(msg, renew_user)
+        
+    # 7. TRIAL
+    elif call.data == 'trial':
+        create_trial(call.message)
+
+    # 6. EDIT (Simplifié pour le bot: Changer le pass)
+    elif call.data == 'edit':
+         msg = bot.send_message(call.message.chat.id, "Envoyez: `USER NOUVEAU_PASS`", parse_mode='Markdown')
+         bot.register_next_step_handler(msg, edit_pass)
+
+# --- FONCTIONS LOGIQUES ---
 def new_user(message):
     try:
         u, p, d = message.text.split()
         os.system(f"useradd -M -s /bin/false -e \$(date -d '+{d} days' +%Y-%m-%d) {u}")
         os.system(f"echo '{u}:{p}' | chpasswd")
-        bot.reply_to(message, f"✅ User {u} créé !")
+        
+        # LE DÉCOR DANS LE BOT
+        decor = f"""
+━━━━━━━━━━━━━━━━━━
+✅ **USER CREATED SUCCESSFULLY**
+━━━━━━━━━━━━━━━━━━
+👤 **User:** `{u}`
+🔑 **Pass:** `{p}`
+🛡️ **Port:** `1-65535`
+📅 **Days:** `{d}`
+🚀 **Type:** `UDP Custom`
+━━━━━━━━━━━━━━━━━━
+"""
+        bot.reply_to(message, decor, parse_mode='Markdown')
     except:
-        bot.reply_to(message, "❌ Erreur format")
+        bot.reply_to(message, "❌ Erreur format.")
 
 def del_user(message):
     u = message.text
     os.system(f"userdel -f {u}")
-    bot.reply_to(message, f"🗑 User {u} supprimé !")
+    bot.reply_to(message, f"🗑 User `{u}` Supprimé !", parse_mode='Markdown')
 
+def renew_user(message):
+    try:
+        u, d = message.text.split()
+        os.system(f"chage -E \$(date -d '+{d} days' +%Y-%m-%d) {u}")
+        bot.reply_to(message, f"✅ User `{u}` prolongé de {d} jours.", parse_mode='Markdown')
+    except:
+        bot.reply_to(message, "❌ Erreur.")
+
+def edit_pass(message):
+    try:
+        u, p = message.text.split()
+        os.system(f"echo '{u}:{p}' | chpasswd")
+        # DÉCOR MODIFICATION
+        decor = f"""
+━━━━━━━━━━━━━━━━━━
+✏️ **USER UPDATED**
+━━━━━━━━━━━━━━━━━━
+👤 **User:** `{u}`
+🔑 **New Pass:** `{p}`
+🛡️ **Port:** `1-65535`
+━━━━━━━━━━━━━━━━━━
+"""
+        bot.reply_to(message, decor, parse_mode='Markdown')
+    except:
+        bot.reply_to(message, "❌ Erreur.")
+
+def create_trial(message):
+    u = "test" + ''.join(random.choices(string.digits, k=4))
+    p = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+    os.system(f"useradd -M -s /bin/false {u}")
+    os.system(f"echo '{u}:{p}' | chpasswd")
+    # Expire dans 30 min (via at)
+    os.system(f"echo 'userdel -f {u}' | at now + 30 minutes")
+    
+    decor = f"""
+━━━━━━━━━━━━━━━━━━
+⏱️ **TRIAL CREATED**
+━━━━━━━━━━━━━━━━━━
+👤 **User:** `{u}`
+🔑 **Pass:** `{p}`
+🛡️ **Port:** `1-65535`
+⏳ **Time:** `30 Minutes`
+━━━━━━━━━━━━━━━━━━
+"""
+    bot.send_message(message.chat.id, decor, parse_mode='Markdown')
+
+print("Bot Started...")
 bot.polling()
 EOF
 
@@ -162,11 +280,11 @@ Restart=always
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload && systemctl enable udp-bot && systemctl restart udp-bot
-  msg -verd " ✅ Bot Démarré ! Allez sur Telegram."
+  msg -verd " ✅ Bot (10 Commandes) Installé et Connecté !"
   enter
 }
 
-# 2. MODIFIER COMPTE (Style Step-by-Step)
+# 2. MODIFIER COMPTE (Step-by-Step avec Décor Final)
 edit_user_pro() {
   title "✏️ MODIFIER UN COMPTE"
   msg -azu " Liste des utilisateurs :"
@@ -201,6 +319,10 @@ edit_user_pro() {
       msg -ne " Nouveau Pass : " && read new_p
       echo "$target:$new_p" | chpasswd
       msg -verd " Password changé."
+      # On stocke le pass pour l'affichage final (si on le connait)
+      pass_display=$new_p
+  else
+      pass_display="***"
   fi
   
   # Step 3: Expiration
@@ -210,6 +332,17 @@ edit_user_pro() {
       chage -E $(date -d "+$days days" +%Y-%m-%d) $target
       msg -verd " Expiration changée."
   fi
+  
+  # LE DÉCOR FINAL DEMANDÉ
+  clear
+  msg -bar
+  print_center -verd "User Modified Successfully"
+  msg -bar
+  msg -ama " 👤 Username  : $target"
+  msg -ama " 🔑 Password  : $pass_display"
+  msg -ama " 🛡️ Port UDP  : 1-65535"
+  msg -ama " 📅 Expiry    : $(chage -l $target | grep 'Account expires' | cut -d: -f2)"
+  msg -bar
   enter
 }
 
@@ -233,19 +366,27 @@ trial_pro() {
   echo "$user:$pass" | chpasswd
   echo "userdel -f $user" | at now + $min minutes >/dev/null 2>&1
   
+  clear
   msg -bar
-  msg -verd " ✅ Trial Créé !"
-  msg -ama " User: $user"
-  msg -ama " Pass: $pass"
-  msg -ama " Exp: $min Minutes"
+  print_center -verd "Trial Created Successfully"
+  msg -bar
+  msg -ama " 👤 Username  : $user"
+  msg -ama " 🔑 Password  : $pass"
+  msg -ama " 🛡️ Port UDP  : 1-65535"
+  msg -ama " ⏳ Duration  : $min Minutes"
+  msg -bar
   enter
 }
 
-# 4. ONLINE USERS
+# 4. ONLINE USERS (Juste le chiffre)
 online_pro() {
   title "🟢 UTILISATEURS EN LIGNE"
-  msg -azu " Connexions actives sur le port :"
-  netstat -nupt | grep udp-custom
+  count=$(netstat -nulp | grep udp-custom | wc -l)
+  msg -bar
+  print_center -verd "Active Users Count"
+  msg -bar
+  echo -e "       \033[1;37mTotal: \033[1;32m$count"
+  msg -bar
   enter
 }
 
@@ -280,7 +421,7 @@ check_license() {
 #                  MENU PRINCIPAL
 # ==================================================
 udp() {
-    title "JOEL DATA - UDP MANAGER V6"
+    title "JOEL DATA - UDP MANAGER V7"
     
     echo -e " \033[1;32m[1]\033[1;33m Créer Utilisateur (SSH/UDP)"
     echo -e " \033[1;32m[2]\033[1;33m Supprimer Utilisateur"
@@ -288,7 +429,6 @@ udp() {
     echo -e " \033[1;32m[4]\033[1;33m Liste des Utilisateurs"
     echo -e " \033[1;32m[5]\033[1;33m Infos VPS (Neofetch)"
     
-    # SECTION PRO+
     if [[ -f "$LICENSE_FILE" ]]; then
         msg -bar2
         print_center -verd "--- OPTIONS PRO+ ---"
@@ -306,7 +446,6 @@ udp() {
     echo -e " \033[1;31m[0]\033[1;37m Quitter"
     msg -bar
     
-    # LECTURE DU CHOIX
     read -p " Sélection : " selection
     case $selection in
         1) add_user ;;
@@ -332,5 +471,4 @@ udp() {
     esac
 }
 
-# Lancement du menu
 udp
