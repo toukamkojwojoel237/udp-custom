@@ -2,7 +2,7 @@
 
 # Run as root
 [[ "$(whoami)" != "root" ]] && {
-    echo -e "\033[1;33m[\033[1;31mErro\033[1;33m] \033[1;37m- \033[1;33myou need to run as root\033[0m"
+    echo -e "\033[1;33m[\033[1;31mError\033[1;33m] \033[1;37m- \033[1;33myou need to run as root\033[0m"
     rm /home/ubuntu/install.sh &>/dev/null
     exit 0
 }
@@ -17,36 +17,23 @@ sudo touch /etc/UDPCustom/udp-custom
 udp_dir='/etc/UDPCustom'
 udp_file='/etc/UDPCustom/udp-custom'
 
+# Installation des dépendances (Ajout de python3 et pip pour le Bot)
 sudo apt update -y
 sudo apt upgrade -y
-sudo apt install -y wget
-sudo apt install -y curl
-sudo apt install -y dos2unix
-sudo apt install -y neofetch
+sudo apt install -y wget curl dos2unix neofetch python3 python3-pip at
 
-source <(curl -sSL 'https://raw.githubusercontent.com/http-custom/udp-custom/main/module/module')
+# === LIEN VERS TON REPOSIT (JOEL DATA) ===
+REPO="https://raw.githubusercontent.com/toukamkojwojoel237/udp-custom/main"
 
-time_reboot() {
-  print_center -ama "${a92:-System/Server Reboot In} $1 ${a93:-Seconds}"
-  REBOOT_TIMEOUT="$1"
-
-  while [ $REBOOT_TIMEOUT -gt 0 ]; do
-    print_center -ne "-$REBOOT_TIMEOUT-\r"
-    sleep 1
-    : $((REBOOT_TIMEOUT--))
-  done
-  rm /home/ubuntu/install.sh &>/dev/null
-  rm /root/install.sh &>/dev/null
-  echo -e "\033[01;31m\033[1;33m More Updates, Follow Us On \033[1;31m(\033[1;36mTelegram\033[1;31m): \033[1;37m@voltssh\033[0m"
-  reboot
-}
+# Chargement du module depuis ton repo
+source <(curl -sSL "$REPO/module/module")
 
 # Check Ubuntu version
 if [ "$(lsb_release -rs)" = "8*|9*|10*|11*|16.04*|18.04*" ]; then
   clear
   print_center -ama -e "\e[1m\e[31m=====================================================\e[0m"
-  print_center -ama -e "\e[1m\e[33m${a94:-this script is not compatible with your operating system}\e[0m"
-  print_center -ama -e "\e[1m\e[33m ${a95:-Use Ubuntu 20 or higher}\e[0m"
+  print_center -ama -e "\e[1m\e[33mOS Incompatible\e[0m"
+  print_center -ama -e "\e[1m\e[33mUse Ubuntu 20 or higher\e[0m"
   print_center -ama -e "\e[1m\e[31m=====================================================\e[0m"
   rm /home/ubuntu/install.sh
   exit 1
@@ -57,49 +44,40 @@ else
   print_center -ama " ⇢ Installation begins...! <"
   sleep 3
 
-    # [change timezone to UTC +0]
+  # [change timezone to UTC +0]
   echo ""
-  echo " ⇢ Binary Core official ePro Dev Team"
-  echo " ⇢ UDP Custom"
+  echo " ⇢ JOEL DATA OFFICIAL SCRIPT"
+  echo " ⇢ UDP Custom Pro"
   sleep 3
 
   # [+clean up+]
   rm -rf $udp_file &>/dev/null
-  rm -rf /etc/UDPCustom/udp-custom &>/dev/null
-  # rm -rf /usr/bin/udp-request &>/dev/null
-  rm -rf /etc/limiter.sh &>/dev/null
-  rm -rf /etc/UDPCustom/limiter.sh &>/dev/null
   rm -rf /etc/UDPCustom/module &>/dev/null
   rm -rf /usr/bin/udp &>/dev/null
-  rm -rf /etc/UDPCustom/udpgw.service &>/dev/null
-  rm -rf /etc/udpgw.service &>/dev/null
-  systemctl stop udpgw &>/dev/null
   systemctl stop udp-custom &>/dev/null
-  # systemctl stop udp-request &>/dev/null
 
- # [+get files ⇣⇣⇣+]
-  source <(curl -sSL 'https://raw.githubusercontent.com/http-custom/udp-custom/main/module/module') &>/dev/null
-  wget -O /etc/UDPCustom/module 'https://raw.githubusercontent.com/http-custom/udp-custom/main/module/module' &>/dev/null
+  # [+get files FROM YOUR REPO ⇣⇣⇣+]
+  source <(curl -sSL "$REPO/module/module") &>/dev/null
+  wget -O /etc/UDPCustom/module "$REPO/module/module" &>/dev/null
   chmod +x /etc/UDPCustom/module
 
-  wget "https://raw.github.com/http-custom/udp-custom/main/bin/udp-custom-linux-amd64" -O /root/udp/udp-custom &>/dev/null
-  # wget "x" -O /usr/bin/udp-request &>/dev/null
+  # Téléchargement du binaire UDP
+  wget "$REPO/bin/udp-custom-linux-amd64" -O /root/udp/udp-custom &>/dev/null
   chmod +x /root/udp/udp-custom
-  # chmod +x /usr/bin/udp-request
 
-  wget -O /etc/limiter.sh 'https://raw.githubusercontent.com/http-custom/udp-custom/main/module/limiter.sh'
+  # Limiter & Gateway
+  wget -O /etc/limiter.sh "$REPO/module/limiter.sh"
   cp /etc/limiter.sh /etc/UDPCustom
   chmod +x /etc/limiter.sh
   chmod +x /etc/UDPCustom
   
-  # [+udpgw+]
-  wget -O /etc/udpgw 'https://raw.github.com/http-custom/udp-custom/main/module/udpgw'
+  wget -O /etc/udpgw "$REPO/module/udpgw"
   mv /etc/udpgw /bin
   chmod +x /bin/udpgw
 
-  # [+service+]
-  wget -O /etc/udpgw.service 'https://raw.githubusercontent.com/http-custom/udp-custom/main/config/udpgw.service'
-  wget -O /etc/udp-custom.service 'https://raw.githubusercontent.com/http-custom/udp-custom/main/config/udp-custom.service'
+  # [+services+]
+  wget -O /etc/udpgw.service "$REPO/config/udpgw.service"
+  wget -O /etc/udp-custom.service "$REPO/config/udp-custom.service"
   
   mv /etc/udpgw.service /etc/systemd/system
   mv /etc/udp-custom.service /etc/systemd/system
@@ -114,12 +92,13 @@ else
   systemctl start udp-custom &>/dev/null
 
   # [+config+]
-  wget "https://raw.githubusercontent.com/http-custom/udp-custom/main/config/config.json" -O /root/udp/config.json &>/dev/null
+  wget "$REPO/config/config.json" -O /root/udp/config.json &>/dev/null
   chmod +x /root/udp/config.json
 
-  # [+menu+]
-  wget -O /usr/bin/udp 'https://raw.githubusercontent.com/http-custom/udp-custom/main/module/udp' 
+  # [+menu (TON FICHIER MODIFIÉ)]
+  wget -O /usr/bin/udp "$REPO/module/udp" 
   chmod +x /usr/bin/udp
+  
   ufw disable &>/dev/null
   sudo apt-get remove --purge ufw firewalld -y
   apt remove netfilter-persistent -y
@@ -130,7 +109,7 @@ else
   sleep 6
   title "${a102:-Installation Successful}"
   print_center -ama "${a103:-  To show menu type: \nudp\n}"
-  echo -ne "\n\033[1;31mENTER \033[1;33mpara entrar al \033[1;32mMENU!\033[0m"; read
-   udp
+  echo -ne "\n\033[1;31mENTER \033[1;33mpour entrer au \033[1;32mMENU!\033[0m"; read
+  udp
   
 fi
