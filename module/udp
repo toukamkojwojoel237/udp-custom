@@ -1,12 +1,11 @@
-#!/bin/bash
+her#!/bin/bash
 
 # Chargement du module graphique
 source /etc/UDPCustom/module
 
 # Configuration
 ADMIN_CONTACT="t.me/joeldata237"
-# ICI C'EST IMPORTANT : On pointe vers TON VPS Principal pour la vérification
-# Tous les clients (amis) viendront vérifier leur clé ici.
+# URL de ton VPS Principal (Laisse ton IP ici)
 VERIFY_URL="http://76.13.8.245:5000/verify" 
 LICENSE_FILE="/etc/udp_pro_active"
 
@@ -101,7 +100,7 @@ list_users() {
 }
 
 # ==================================================
-#            FONCTIONS PRO+ (BOT CENTRAL V5)
+#            FONCTIONS PRO+ (BOT V12 MASTER)
 # ==================================================
 
 install_bot_pro() {
@@ -113,7 +112,7 @@ install_bot_pro() {
   
   vps_ip=$(curl -s ipv4.icanhazip.com)
 
-  msg -verd " Installation des dépendances Python (Flask/Telebot)..."
+  msg -verd " Installation des dépendances Python..."
   apt-get install python3-pip at sqlite3 -y > /dev/null 2>&1
   pip3 install pyTelegramBotAPI flask > /dev/null 2>&1
 
@@ -138,23 +137,21 @@ ADMIN_ID = "ADMIN_ID_PLACEHOLDER"
 VPS_IP = "IP_PLACEHOLDER"
 DB_PATH = "/etc/UDPCustom/bot_data.db"
 PORT_API = 5000
+ITEMS_PER_PAGE = 6  # Nombre d'utilisateurs par page
 # ---------------------
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-# --- BASE DE DONNÉES (Users + Licences) ---
+# --- BASE DE DONNÉES ---
 def init_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     c = conn.cursor()
-    # Table des utilisateurs SSH/UDP
     c.execute('''CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)''')
-    # Table des licences (pour les scripts amis)
     c.execute('''CREATE TABLE IF NOT EXISTS licenses (key_text TEXT PRIMARY KEY, status TEXT, expires_at TIMESTAMP)''')
     conn.commit()
     conn.close()
 
-# -- Gestion Users --
 def save_user_db(user, password):
     try:
         conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -205,28 +202,20 @@ def check_license_db(key):
     res = c.fetchone()
     conn.close()
     if not res: return False
-    
-    # Vérif date
     try:
         exp_date = datetime.datetime.strptime(res[0], "%Y-%m-%d %H:%M:%S.%f")
-    except:
-        return True # Si format date complexe (ou max), on accepte
-        
-    if datetime.datetime.now() < exp_date:
-        return True
+    except: return True
+    if datetime.datetime.now() < exp_date: return True
     return False
 
-# --- API FLASK (Vérification Distante) ---
+# --- API FLASK ---
 @app.route('/verify', methods=['GET'])
 def verify_api():
     key = request.args.get('key')
-    if check_license_db(key):
-        return "VALID", 200
-    else:
-        return "INVALID", 403
+    if check_license_db(key): return "VALID", 200
+    else: return "INVALID", 403
 
 def run_flask():
-    # Ecoute sur 0.0.0.0 pour accepter les connexions externes (Amis)
     app.run(host='0.0.0.0', port=PORT_API)
 
 # --- OUTILS SYSTÈME ---
@@ -256,18 +245,14 @@ def parse_duration(text):
 # --- MENU TELEGRAM ---
 def main_menu():
     markup = types.InlineKeyboardMarkup(row_width=2)
-    # Gestion Users
     b1 = types.InlineKeyboardButton("👤 Créer User", callback_data='add_wiz')
-    b2 = types.InlineKeyboardButton("👥 Liste Users", callback_data='list_menu')
+    b2 = types.InlineKeyboardButton("👥 Liste Users", callback_data='list_menu:0')
     b3 = types.InlineKeyboardButton("🔄 Renouveler", callback_data='renew_menu')
     b4 = types.InlineKeyboardButton("✏️ Modifier", callback_data='edit_menu')
     b5 = types.InlineKeyboardButton("🗑 Supprimer", callback_data='del_menu')
-    # Outils
-    b6 = types.InlineKeyboardButton("⏱ Trial", callback_data='trial_menu')
+    b6 = types.InlineKeyboardButton("⏱ Trial (Test)", callback_data='trial_menu')
     b7 = types.InlineKeyboardButton("🖥 Infos VPS", callback_data='info')
-    # Business (Licences)
     b8 = types.InlineKeyboardButton("🔑 Gérer Licences", callback_data='lic_menu')
-    
     markup.add(b1, b2, b3, b4, b5, b6, b7, b8)
     return markup
 
@@ -284,42 +269,40 @@ def callback_query(call):
     if call.data == "home":
         bot.edit_message_text("🔰 **MENU PRINCIPAL** 🔰", call.message.chat.id, call.message.message_id, reply_markup=main_menu(), parse_mode="Markdown")
 
-    # === GESTION LICENCES (BUSINESS) ===
-    elif call.data == "lic_menu":
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("➕ Créer Clé (30 Jours)", callback_data="gen_key:30"))
-        markup.add(types.InlineKeyboardButton("➕ Créer Clé (À Vie)", callback_data="gen_key:999"))
-        markup.add(types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
-        bot.edit_message_text("🔑 **PANEL LICENCES SCRIPT**\nGénérez des clés pour activer le script PRO+ sur d'autres VPS.", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
-
-    elif call.data.startswith("gen_key:"):
-        days = int(call.data.split(":")[1])
-        key, exp = create_license(days)
-        if days == 999: d_txt = "À Vie"
-        else: d_txt = f"{days} Jours"
+    # === LISTE USERS AVEC PAGINATION ===
+    elif call.data.startswith("list_menu"):
+        try:
+            page = int(call.data.split(":")[1])
+        except: page = 0
         
-        decor = f"""
-✅ **LICENCE GÉNÉRÉE**
-━━━━━━━━━━━━━━━━━━
-🔑 **Clé :** `{key}`
-📅 **Validité :** {d_txt}
-━━━━━━━━━━━━━━━━━━
-Donnez cette clé à votre ami pour activer le menu PRO+.
-"""
-        bot.send_message(call.message.chat.id, decor, parse_mode="Markdown")
-        bot.send_message(call.message.chat.id, "Menu :", reply_markup=main_menu())
-
-    # === LISTE USERS ===
-    elif call.data == "list_menu":
         users = get_users_list()
+        
+        # Pagination Logique
+        start = page * ITEMS_PER_PAGE
+        end = start + ITEMS_PER_PAGE
+        current_users = users[start:end]
+        
         markup = types.InlineKeyboardMarkup(row_width=2)
-        if not users: markup.add(types.InlineKeyboardButton("Vide", callback_data="home"))
+        
+        if not current_users:
+            markup.add(types.InlineKeyboardButton("Aucun utilisateur", callback_data="home"))
         else:
-            for u in users: markup.add(types.InlineKeyboardButton(f"👤 {u}", callback_data=f"view_user:{u}"))
-        markup.add(types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
-        bot.edit_message_text("📂 **Liste Clients :**", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+            for u in current_users:
+                markup.add(types.InlineKeyboardButton(f"👤 {u}", callback_data=f"view_user:{u}"))
+        
+        # Boutons Navigation
+        nav_btns = []
+        if page > 0:
+            nav_btns.append(types.InlineKeyboardButton("⬅️ Préc", callback_data=f"list_menu:{page-1}"))
+        if end < len(users):
+            nav_btns.append(types.InlineKeyboardButton("Suiv ➡️", callback_data=f"list_menu:{page+1}"))
+        
+        if nav_btns: markup.row(*nav_btns)
+        markup.add(types.InlineKeyboardButton("🔙 Retour Accueil", callback_data="home"))
+        
+        bot.edit_message_text(f"📂 **Liste Clients (Page {page+1}) :**", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
 
-    # DÉTAILS USER (+ PASS VISIBLE)
+    # DÉTAILS USER (+ Design Pro)
     elif call.data.startswith("view_user:"):
         user = call.data.split(":")[1]
         exp = get_expiry(user)
@@ -339,10 +322,70 @@ Donnez cette clé à votre ami pour activer le menu PRO+.
 `{format_client}`
 """
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔙 Liste", callback_data="list_menu"), types.InlineKeyboardButton("🏠 Accueil", callback_data="home"))
+        markup.add(types.InlineKeyboardButton("🔙 Liste", callback_data="list_menu:0"), types.InlineKeyboardButton("🏠 Accueil", callback_data="home"))
         bot.edit_message_text(decor, call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
-    # === SUPPRESSION ===
+    # === TRIAL (Design Pro Restauré) ===
+    elif call.data == "trial_menu":
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("⏱ 30 Min", callback_data="trial:30"), types.InlineKeyboardButton("⏱ 1 H", callback_data="trial:60"), types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
+        bot.edit_message_text("⏳ Durée du test :", call.message.chat.id, call.message.message_id, reply_markup=markup)
+
+    elif call.data.startswith("trial:"):
+        mins = int(call.data.split(":")[1])
+        user = "test" + ''.join(random.choices(string.digits, k=4))
+        pwd = generate_pass(4)
+        os.system(f"useradd -M -s /bin/false {user}")
+        os.system(f"echo '{user}:{pwd}' | chpasswd")
+        os.system(f"echo 'userdel -f {user}' | at now + {mins} minutes")
+        save_user_db(user, pwd)
+        format_client = f"{VPS_IP}:1-65535@{user}:{pwd}"
+        
+        decor = f"""
+━━━━━━━━━━━━━━━━━━
+✅ **COMPTE TEST ACTIVÉ**
+━━━━━━━━━━━━━━━━━━
+👤 **User :** `{user}`
+🔑 **Pass :** `{pwd}`
+⏳ **Durée :** `{mins} Minutes`
+🛡 **Port :** `1-65535`
+━━━━━━━━━━━━━━━━━━
+👇 **Format Client :**
+`{format_client}`
+"""
+        bot.send_message(call.message.chat.id, decor, parse_mode="Markdown")
+        bot.send_message(call.message.chat.id, "Menu:", reply_markup=main_menu())
+
+    # === ADD USER ===
+    elif call.data == "add_wiz":
+        msg = bot.send_message(call.message.chat.id, "👤 **Nom d'utilisateur** :", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, step_name)
+
+    # === LICENCES ===
+    elif call.data == "lic_menu":
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("➕ Créer Clé (30 Jours)", callback_data="gen_key:30"))
+        markup.add(types.InlineKeyboardButton("➕ Créer Clé (À Vie)", callback_data="gen_key:999"))
+        markup.add(types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
+        bot.edit_message_text("🔑 **PANEL LICENCES**", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+
+    elif call.data.startswith("gen_key:"):
+        days = int(call.data.split(":")[1])
+        key, exp = create_license(days)
+        d_txt = "À Vie" if days == 999 else f"{days} Jours"
+        decor = f"""
+✅ **LICENCE GÉNÉRÉE**
+━━━━━━━━━━━━━━━━━━
+🔑 **Clé :** `{key}`
+📅 **Validité :** {d_txt}
+━━━━━━━━━━━━━━━━━━
+"""
+        bot.send_message(call.message.chat.id, decor, parse_mode="Markdown")
+        bot.send_message(call.message.chat.id, "Menu :", reply_markup=main_menu())
+
+    # === AUTRES (Supprimer, Renouveler, Modifier, Infos) ===
+    # (Je garde les autres fonctions mais avec le bouton retour accueil)
+    
     elif call.data == "del_menu":
         users = get_users_list()
         markup = types.InlineKeyboardMarkup(row_width=2)
@@ -364,7 +407,6 @@ Donnez cette clé à votre ami pour activer le menu PRO+.
         markup.add(types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
         bot.edit_message_text(f"✅ `{user}` supprimé.", call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
-    # === RENOUVELLEMENT ===
     elif call.data == "renew_menu":
         users = get_users_list()
         markup = types.InlineKeyboardMarkup(row_width=2)
@@ -377,7 +419,6 @@ Donnez cette clé à votre ami pour activer le menu PRO+.
         msg = bot.send_message(call.message.chat.id, f"👤 **User:** `{user}`\nEntrez la durée (ex: `10d`, `1h`) :", parse_mode="Markdown")
         bot.register_next_step_handler(msg, step_renew_process, user)
 
-    # === MODIFIER ===
     elif call.data == "edit_menu":
         users = get_users_list()
         markup = types.InlineKeyboardMarkup(row_width=2)
@@ -390,34 +431,11 @@ Donnez cette clé à votre ami pour activer le menu PRO+.
         msg = bot.send_message(call.message.chat.id, f"📝 Modif `{user}`\nEntrez **NOUVEAU NOM** (ou 'meme') :", parse_mode="Markdown")
         bot.register_next_step_handler(msg, step_edit_name, user)
 
-    # === TRIAL & ADD ===
-    elif call.data == "trial_menu":
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("⏱ 30 Min", callback_data="trial:30"), types.InlineKeyboardButton("⏱ 1 H", callback_data="trial:60"), types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
-        bot.edit_message_text("⏳ Durée du test :", call.message.chat.id, call.message.message_id, reply_markup=markup)
-
-    elif call.data.startswith("trial:"):
-        mins = int(call.data.split(":")[1])
-        user = "test" + ''.join(random.choices(string.digits, k=4))
-        pwd = generate_pass(4)
-        os.system(f"useradd -M -s /bin/false {user}")
-        os.system(f"echo '{user}:{pwd}' | chpasswd")
-        os.system(f"echo 'userdel -f {user}' | at now + {mins} minutes")
-        save_user_db(user, pwd)
-        format_client = f"{VPS_IP}:1-65535@{user}:{pwd}"
-        decor = f"✅ **TRIAL {mins} MIN**\n👤 `{user}`\n🔑 `{pwd}`\n\n`{format_client}`"
-        bot.send_message(call.message.chat.id, decor, parse_mode="Markdown")
-        bot.send_message(call.message.chat.id, "Menu:", reply_markup=main_menu())
-
-    elif call.data == "add_wiz":
-        msg = bot.send_message(call.message.chat.id, "👤 **Nom d'utilisateur** :", parse_mode="Markdown")
-        bot.register_next_step_handler(msg, step_name)
-
     elif call.data == "info":
         ram = run_cmd("free -m | awk 'NR==2{printf \"%.2f%%\", $3*100/$2 }'")
         bot.answer_callback_query(call.id, f"IP: {VPS_IP} | RAM: {ram}", show_alert=True)
 
-# --- STEPS ---
+# --- STEPS (Design Pro Restauré) ---
 def step_name(message):
     user = message.text
     msg = bot.send_message(message.chat.id, f"User: `{user}`\n🔑 **Mot de Passe** :", parse_mode="Markdown")
@@ -435,7 +453,19 @@ def step_days(message, user, pwd):
         os.system(f"echo '{user}:{pwd}' | chpasswd")
         save_user_db(user, pwd)
         format_client = f"{VPS_IP}:1-65535@{user}:{pwd}"
-        decor = f"✅ **CRÉÉ**\n👤 `{user}`\n🔑 `{pwd}`\n📅 `{days}j`\n\n`{format_client}`"
+        
+        decor = f"""
+━━━━━━━━━━━━━━━━━━
+✅ **COMPTE CRÉÉ**
+━━━━━━━━━━━━━━━━━━
+👤 **User :** `{user}`
+🔑 **Pass :** `{pwd}`
+📅 **Jours :** `{days}`
+🛡 **Port :** `1-65535`
+━━━━━━━━━━━━━━━━━━
+👇 **Format Client :**
+`{format_client}`
+"""
         bot.send_message(message.chat.id, decor, parse_mode="Markdown", reply_markup=main_menu())
     except: bot.send_message(message.chat.id, "❌ Erreur durée.")
 
@@ -475,15 +505,24 @@ def step_edit_final(message, user, pwd):
         try: os.system(f"chage -E $(date -d '+{message.text} days' +%Y-%m-%d) {user}")
         except: pass
     format_client = f"{VPS_IP}:1-65535@{user}:{pwd}"
-    bot.send_message(message.chat.id, f"✅ **MODIFIÉ**\n`{format_client}`", parse_mode="Markdown", reply_markup=main_menu())
+    decor = f"""
+━━━━━━━━━━━━━━━━━━
+✏️ **COMPTE MODIFIÉ**
+━━━━━━━━━━━━━━━━━━
+👤 **User :** `{user}`
+🔑 **Pass :** `{pwd}`
+🛡 **Port :** `1-65535`
+━━━━━━━━━━━━━━━━━━
+👇 **Nouveau Format :**
+`{format_client}`
+"""
+    bot.send_message(message.chat.id, decor, parse_mode="Markdown", reply_markup=main_menu())
 
 # --- LANCEMENT MULTI-THREAD ---
 if __name__ == '__main__':
     init_db()
-    # Thread Flask (API)
     t = threading.Thread(target=run_flask)
     t.start()
-    # Main Bot
     print("Bot & API Started...")
     bot.polling(non_stop=True)
 PYTHON_MARKER
@@ -511,8 +550,7 @@ SERVICE_MARKER
   systemctl enable udp-bot
   systemctl restart udp-bot
   
-  msg -verd " ✅ Bot Central V5 (Licences + Passwords) Installé !"
-  msg -verd " ℹ️  Les autres VPS pourront vérifier les clés sur http://$vps_ip:5000"
+  msg -verd " ✅ Bot Central (Design Pro & Pagination) Installé !"
   enter
 }
 
@@ -520,6 +558,10 @@ SERVICE_MARKER
 online_pro() {
   title "🟢 UTILISATEURS EN LIGNE"
   count=$(netstat -nulp | grep udp-custom | wc -l)
+  msg -bar
+  print_center -verd "Active Users Count"
+  msg -bar
+  echo -e "       \033[1;37mTotal: \033[1;32m$count"
   msg -bar
   enter
 }
@@ -555,7 +597,7 @@ check_license() {
 #                  MENU PRINCIPAL
 # ==================================================
 udp() {
-    title "JOEL DATA - UDP MANAGER V11"
+    title "JOEL DATA - UDP MANAGER V12"
     
     echo -e " \033[1;32m[1]\033[1;33m Créer Utilisateur (Manuel)"
     echo -e " \033[1;32m[2]\033[1;33m Supprimer Utilisateur"
