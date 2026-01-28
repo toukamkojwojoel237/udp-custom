@@ -5,11 +5,10 @@ source /etc/UDPCustom/module
 
 # Configuration
 ADMIN_CONTACT="t.me/joeldata237"
-VERIFY_URL="http://127.0.0.1:5000/verify"
 LICENSE_FILE="/etc/udp_pro_active"
 
 # ==================================================
-#            FONCTIONS DE BASE (BASH CLASSIQUE)
+#            FONCTIONS DE BASE (BASH)
 # ==================================================
 
 add_user() {
@@ -36,7 +35,6 @@ add_user() {
     msg -ama " 🔑 Password  : $pass"
     msg -ama " 🛡️ Port UDP  : 1-65535"
     msg -ama " 📅 Expiry    : $(date -d "+$days days" +%Y-%m-%d)"
-    msg -ama " 🚀 Tunneleur : UDP Custom / HTTP Custom"
     msg -bar
     enter
 }
@@ -96,25 +94,23 @@ list_users() {
 }
 
 # ==================================================
-#            FONCTIONS PRO+ (BOT AMÉLIORÉ)
+#            FONCTIONS PRO+ (BOT V3 - COMPLET)
 # ==================================================
 
 install_bot_pro() {
-  title "🤖 INSTALLATION BOT TELEGRAM PRO V2"
-  msg -azu " Installation du Panel de Gestion UDP via Telegram."
+  title "🤖 INSTALLATION BOT TELEGRAM PRO V3"
+  msg -azu " Installation du Panel de Gestion Complet."
   msg -bar
   msg -ne " Token Bot (BotFather): " && read token
   msg -ne " ID Admin Telegram: " && read admin_id
   
-  # Récupération IP pour la commande One-Liner
   vps_ip=$(curl -s ipv4.icanhazip.com)
 
   msg -verd " Installation des dépendances Python..."
   apt-get install python3-pip at -y > /dev/null 2>&1
   pip3 install pyTelegramBotAPI > /dev/null 2>&1
 
-  # CRÉATION DU SCRIPT PYTHON (LE CERVEAU DU BOT)
-  # Nous utilisons EOF avec quotes pour protéger le code Python
+  # --- CRÉATION DU SCRIPT PYTHON ---
   cat << 'EOF' > /etc/UDPCustom/udp_bot.py
 import telebot
 from telebot import types
@@ -124,70 +120,209 @@ import random
 import string
 import datetime
 import time
+import re
 
-# --- CONFIGURATION (Injectée par le script bash) ---
+# --- CONFIGURATION ---
 TOKEN = "TOKEN_PLACEHOLDER"
-ADMIN_ID = ADMIN_ID_PLACEHOLDER
+ADMIN_ID = "ADMIN_ID_PLACEHOLDER"
 VPS_IP = "IP_PLACEHOLDER"
-# ---------------------------------------------------
+# ---------------------
 
 bot = telebot.TeleBot(TOKEN)
 
-# --- FONCTIONS SYSTÈME ---
+# --- OUTILS ---
 def run_cmd(cmd):
     return subprocess.getoutput(cmd)
 
 def generate_pass(length=6):
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
-def get_expiry_date(days):
-    return (datetime.datetime.now() + datetime.timedelta(days=int(days))).strftime("%Y-%m-%d")
+def get_users_list():
+    # Récupère uniquement les utilisateurs créés par le script (shell /bin/false)
+    cmd = "awk -F: '/\/bin\/false/ {print $1}' /etc/passwd"
+    users = run_cmd(cmd).split('\n')
+    return [u for u in users if u]
+
+def get_user_pass(user):
+    # Tente de récupérer le mot de passe dans /etc/shadow (nécessite root)
+    # Note: C'est complexe de récupérer le pass en clair sous Linux.
+    # Ici, on ne peut souvent pas récupérer le vrai pass, on met "Masqué" ou on le stocke ailleurs.
+    # Pour ce script, on assume qu'on ne peut pas lire le pass en clair après création sauf si on utilise une DB.
+    return "Masqué (Sécurité)" 
+
+def get_expiry(user):
+    try:
+        cmd = f"chage -l {user} | grep 'Account expires' | cut -d: -f2"
+        return run_cmd(cmd).strip()
+    except:
+        return "Erreur"
+
+def parse_duration(text):
+    match = re.match(r"(\d+)([mhd])", text.lower())
+    if not match: return None
+    val, unit = int(match.group(1)), match.group(2)
+    return val, unit # Retourne valeur et unité
 
 # --- MENU PRINCIPAL ---
 def main_menu():
     markup = types.InlineKeyboardMarkup(row_width=2)
     b1 = types.InlineKeyboardButton("👤 Créer User", callback_data='add_wiz')
-    b2 = types.InlineKeyboardButton("🗑 Supprimer", callback_data='del_wiz')
-    b3 = types.InlineKeyboardButton("🔄 Renouveler", callback_data='renew_wiz')
-    b4 = types.InlineKeyboardButton("👥 Liste Users", callback_data='list')
-    b5 = types.InlineKeyboardButton("⏱ Trial (Test)", callback_data='trial_menu')
-    b6 = types.InlineKeyboardButton("🟢 Online", callback_data='online')
+    b2 = types.InlineKeyboardButton("👥 Liste Users", callback_data='list_menu')
+    b3 = types.InlineKeyboardButton("🔄 Renouveler", callback_data='renew_menu')
+    b4 = types.InlineKeyboardButton("✏️ Modifier", callback_data='edit_menu')
+    b5 = types.InlineKeyboardButton("🗑 Supprimer", callback_data='del_menu')
+    b6 = types.InlineKeyboardButton("⏱ Trial (Test)", callback_data='trial_menu')
     b7 = types.InlineKeyboardButton("🖥 Infos VPS", callback_data='info')
-    markup.add(b1, b2, b3, b4, b5, b6, b7)
+    b8 = types.InlineKeyboardButton("📞 Contact", url="https://t.me/joeldata237")
+    markup.add(b1, b2, b3, b4, b5, b6, b7, b8)
     return markup
 
 @bot.message_handler(commands=['start', 'menu'])
 def send_welcome(message):
     if str(message.chat.id) == str(ADMIN_ID):
-        bot.reply_to(message, "🔰 **JOEL DATA - UDP MANAGER** 🔰\n\nBienvenue Maître. Gérez vos clients ci-dessous :", reply_markup=main_menu(), parse_mode="Markdown")
+        bot.reply_to(message, "🔰 **JOEL DATA - UDP MANAGER PRO** 🔰\n\nBienvenue Maître. Gérez vos clients ci-dessous :", reply_markup=main_menu(), parse_mode="Markdown")
 
-# --- GESTION DES CLICS (CALLBACKS) ---
+# --- GESTION DES CLICS ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     if str(call.message.chat.id) != str(ADMIN_ID): return
 
-    # 1. MENU TRIAL
-    if call.data == "trial_menu":
+    # RETOUR ACCUEIL
+    if call.data == "home":
+        bot.edit_message_text("🔰 **MENU PRINCIPAL** 🔰", call.message.chat.id, call.message.message_id, reply_markup=main_menu(), parse_mode="Markdown")
+
+    # ================= LISTE USERS (BOUTONS) =================
+    elif call.data == "list_menu":
+        users = get_users_list()
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        if not users:
+            markup.add(types.InlineKeyboardButton("Aucun utilisateur", callback_data="home"))
+        else:
+            for u in users:
+                markup.add(types.InlineKeyboardButton(f"👤 {u}", callback_data=f"view_user:{u}"))
+        markup.add(types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
+        bot.edit_message_text("📂 **Sélectionnez un utilisateur pour voir les détails :**", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+
+    # DÉTAILS USER (Depuis Liste)
+    elif call.data.startswith("view_user:"):
+        user = call.data.split(":")[1]
+        exp = get_expiry(user)
+        # Format demandé : ip:port@user:pass
+        # Note: Pass est masqué car Linux le hash.
+        format_client = f"{VPS_IP}:1-65535@{user}:****" 
+        
+        decor = f"""
+━━━━━━━━━━━━━━━━━━
+👤 **DÉTAILS COMPTE**
+━━━━━━━━━━━━━━━━━━
+👤 **User :** `{user}`
+🔑 **Pass :** `****`
+📅 **Expire :** `{exp}`
+🛡 **Port :** `1-65535`
+━━━━━━━━━━━━━━━━━━
+👇 **Format Client :**
+`{format_client}`
+"""
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔙 Retour Liste", callback_data="list_menu"),
+                   types.InlineKeyboardButton("🏠 Accueil", callback_data="home"))
+        bot.edit_message_text(decor, call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+
+
+    # ================= SUPPRIMER (BOUTONS) =================
+    elif call.data == "del_menu":
+        users = get_users_list()
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        if not users:
+            markup.add(types.InlineKeyboardButton("Vide", callback_data="home"))
+        else:
+            for u in users:
+                markup.add(types.InlineKeyboardButton(f"❌ {u}", callback_data=f"pre_del:{u}"))
+        markup.add(types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
+        bot.edit_message_text("🗑 **Sélectionnez un utilisateur à SUPPRIMER :**", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+
+    # CONFIRMATION SUPPRESSION
+    elif call.data.startswith("pre_del:"):
+        user = call.data.split(":")[1]
+        exp = get_expiry(user)
+        decor = f"""
+━━━━━━━━━━━━━━━━━━
+⚠️ **CONFIRMATION SUPPRESSION**
+━━━━━━━━━━━━━━━━━━
+👤 **User :** `{user}`
+📅 **Expire :** `{exp}`
+━━━━━━━━━━━━━━━━━━
+Voulez-vous vraiment supprimer ce compte ?
+"""
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("✅ OUI, Supprimer", callback_data=f"do_del:{user}"))
+        markup.add(types.InlineKeyboardButton("🔙 NON, Retour", callback_data="del_menu"))
+        bot.edit_message_text(decor, call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+
+    # ACTION SUPPRESSION
+    elif call.data.startswith("do_del:"):
+        user = call.data.split(":")[1]
+        os.system(f"userdel -f {user}")
+        bot.answer_callback_query(call.id, f"Compte {user} supprimé !")
+        # Retour à la liste de suppression mise à jour
+        # On rappelle la fonction comme si on cliquait sur del_menu
+        # (Astuce simple: on simule un clic del_menu)
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔙 Retour Menu", callback_data="home"))
+        bot.edit_message_text(f"✅ Compte `{user}` supprimé avec succès.", call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+
+
+    # ================= RENOUVELER (BOUTONS) =================
+    elif call.data == "renew_menu":
+        users = get_users_list()
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        for u in users:
+            markup.add(types.InlineKeyboardButton(f"🔄 {u}", callback_data=f"renew_wiz:{u}"))
+        markup.add(types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
+        bot.edit_message_text("🔄 **Sélectionnez un utilisateur à RENOUVELER :**", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+
+    # WIZARD RENOUVELLEMENT (Entrée temps)
+    elif call.data.startswith("renew_wiz:"):
+        user = call.data.split(":")[1]
+        msg = bot.send_message(call.message.chat.id, f"👤 **User:** `{user}`\n\nEntrez la durée à ajouter (ex: `10m`, `10h`, `10d`) :", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, step_renew_process, user)
+
+
+    # ================= MODIFIER (BOUTONS) =================
+    elif call.data == "edit_menu":
+        users = get_users_list()
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        for u in users:
+            markup.add(types.InlineKeyboardButton(f"✏️ {u}", callback_data=f"edit_start:{u}"))
+        markup.add(types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
+        bot.edit_message_text("✏️ **Sélectionnez un utilisateur à MODIFIER :**", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    
+    # WIZARD MODIF (Step 1: New Name)
+    elif call.data.startswith("edit_start:"):
+        user = call.data.split(":")[1]
+        msg = bot.send_message(call.message.chat.id, f"📝 Modification de `{user}`\n\nEntrez le **NOUVEAU NOM** (ou tapez 'meme' pour garder le même) :", parse_mode="Markdown")
+        bot.register_next_step_handler(msg, step_edit_name, user)
+
+
+    # ================= TRIAL & ADD =================
+    elif call.data == "trial_menu":
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("⏱ 30 Min", callback_data="trial:30"),
                    types.InlineKeyboardButton("⏱ 1 Heure", callback_data="trial:60"))
         markup.add(types.InlineKeyboardButton("🔙 Retour", callback_data="home"))
         bot.edit_message_text("⏳ Choisissez la durée du test :", call.message.chat.id, call.message.message_id, reply_markup=markup)
 
-    # 2. CRÉATION TRIAL
     elif call.data.startswith("trial:"):
         mins = int(call.data.split(":")[1])
-        user = "test" + ''.join(random.choices(string.digits, k=3))
+        user = "test" + ''.join(random.choices(string.digits, k=4))
         pwd = generate_pass(4)
         
-        # Commande système
         os.system(f"useradd -M -s /bin/false {user}")
         os.system(f"echo '{user}:{pwd}' | chpasswd")
-        # Expiration auto via 'at'
         os.system(f"echo 'userdel -f {user}' | at now + {mins} minutes")
         
-        # Commande Client One-Liner
-        cmd_client = f"wget http://{VPS_IP}:81/udp.sh -O udp.sh && chmod +x udp.sh && ./udp.sh {user} {pwd}"
+        # Format demandé: ip:port@user:pass
+        format_client = f"{VPS_IP}:1-65535@{user}:{pwd}"
         
         decor = f"""
 ━━━━━━━━━━━━━━━━━━
@@ -196,54 +331,23 @@ def callback_query(call):
 👤 **User :** `{user}`
 🔑 **Pass :** `{pwd}`
 ⏳ **Durée :** {mins} Minutes
-🛡 **Port :** 1-65535
+🛡 **Port :** `1-65535`
 ━━━━━━━━━━━━━━━━━━
 👇 **Donnez ceci au client :**
-`{cmd_client}`
+`{format_client}`
 """
-        bot.edit_message_text(decor, call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+        bot.send_message(call.message.chat.id, decor, parse_mode="Markdown")
         bot.send_message(call.message.chat.id, "Menu Principal :", reply_markup=main_menu())
 
-    # 3. WIZARD AJOUT USER
     elif call.data == "add_wiz":
         msg = bot.send_message(call.message.chat.id, "👤 Entrez le **Nom d'utilisateur** :", parse_mode="Markdown")
         bot.register_next_step_handler(msg, step_name)
 
-    # 4. LISTE USERS
-    elif call.data == "list":
-        # On liste les utilisateurs qui ont /bin/false comme shell
-        cmd = "awk -F: '/\/bin\/false/ {print $1}' /etc/passwd"
-        users = run_cmd(cmd)
-        if not users: users = "Aucun utilisateur."
-        bot.edit_message_text(f"📂 **Utilisateurs UDP :**\n\n{users}", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
-        # Retour menu
-        bot.send_message(call.message.chat.id, "Menu :", reply_markup=main_menu())
-
-    # 5. INFO VPS
     elif call.data == "info":
         ram = run_cmd("free -m | awk 'NR==2{printf \"%.2f%%\", $3*100/$2 }'")
-        ip = VPS_IP
-        bot.answer_callback_query(call.id, f"IP: {ip} | RAM: {ram}")
+        bot.answer_callback_query(call.id, f"IP: {VPS_IP} | RAM: {ram}", show_alert=True)
 
-    # 6. SUPPRIMER WIZARD
-    elif call.data == "del_wiz":
-        msg = bot.send_message(call.message.chat.id, "🗑 Entrez le **Username** à supprimer :", parse_mode="Markdown")
-        bot.register_next_step_handler(msg, step_del)
-
-    # 7. RENEW WIZARD
-    elif call.data == "renew_wiz":
-        msg = bot.send_message(call.message.chat.id, "🔄 Entrez le **Username** à renouveler :", parse_mode="Markdown")
-        bot.register_next_step_handler(msg, step_renew_name)
-    
-    # 8. ONLINE
-    elif call.data == "online":
-        count = run_cmd("netstat -nulp | grep udp-custom | wc -l")
-        bot.answer_callback_query(call.id, f"Utilisateurs en ligne : {count}")
-
-    elif call.data == "home":
-        bot.edit_message_text("Menu Principal :", call.message.chat.id, call.message.message_id, reply_markup=main_menu())
-
-# --- ÉTAPES (STEPS) ---
+# --- STEPS AJOUT USER ---
 def step_name(message):
     user = message.text
     msg = bot.send_message(message.chat.id, f"User: `{user}`\n🔑 Entrez le **Mot de Passe** :", parse_mode="Markdown")
@@ -257,45 +361,108 @@ def step_pass(message, user):
 def step_days(message, user, pwd):
     try:
         days = int(message.text)
-        # Création Système
         os.system(f"useradd -M -s /bin/false -e $(date -d '+{days} days' +%Y-%m-%d) {user}")
         os.system(f"echo '{user}:{pwd}' | chpasswd")
         
-        cmd_client = f"wget http://{VPS_IP}:81/udp.sh -O udp.sh && chmod +x udp.sh && ./udp.sh {user} {pwd}"
+        format_client = f"{VPS_IP}:1-65535@{user}:{pwd}"
 
         decor = f"""
 ━━━━━━━━━━━━━━━━━━
-✅ **UTILISATEUR CRÉÉ**
+✅ **COMPTE CRÉÉ**
 ━━━━━━━━━━━━━━━━━━
 👤 **User :** `{user}`
 🔑 **Pass :** `{pwd}`
 📅 **Jours :** {days}
-🛡 **Port :** 1-65535
+🛡 **Port :** `1-65535`
 ━━━━━━━━━━━━━━━━━━
 👇 **Donnez ceci au client :**
-`{cmd_client}`
+`{format_client}`
 """
         bot.send_message(message.chat.id, decor, parse_mode="Markdown", reply_markup=main_menu())
     except:
-        bot.send_message(message.chat.id, "❌ Erreur durée (chiffre requis).")
+        bot.send_message(message.chat.id, "❌ Erreur durée.")
 
-def step_del(message):
-    user = message.text
-    os.system(f"userdel -f {user}")
-    bot.reply_to(message, f"🗑 Utilisateur `{user}` supprimé.", parse_mode="Markdown", reply_markup=main_menu())
+# --- STEPS RENOUVELLEMENT ---
+def step_renew_process(message, user):
+    txt = message.text # ex: 10m, 1h, 10d
+    res = parse_duration(txt)
+    
+    if not res:
+        bot.send_message(message.chat.id, "❌ Format invalide. Utilisez `m` (min), `h` (heure), `d` (jour). Ex: `30d`", parse_mode="Markdown")
+        return
 
-def step_renew_name(message):
-    user = message.text
-    msg = bot.send_message(message.chat.id, f"User: `{user}`\n📅 Combien de **Jours** ajouter ?", parse_mode="Markdown")
-    bot.register_next_step_handler(msg, step_renew_days, user)
+    val, unit = res
+    
+    # Calcul de la commande système pour chage ou at (complexe pour at, on reste sur chage pour jours)
+    # Pour simplifier, si c'est 'd' on utilise chage, sinon on utilise 'at' pour delete
+    
+    if unit == 'd':
+        os.system(f"chage -E $(date -d '+{val} days' +%Y-%m-%d) {user}")
+        msg_fin = f"Prolongé de {val} Jours."
+    elif unit == 'h':
+         # Pas de chage possible en heures précises facilement, on simule ou on utilise 'at' pour expiration forcée
+         # Ici on va assumer que l'user veut changer l'expiration système. Linux gère mal les heures pour compte user.
+         # On va utiliser 'at' pour supprimer le compte dans X heures
+         os.system(f"echo 'userdel -f {user}' | at now + {val} hours")
+         msg_fin = f"Expire dans {val} Heures."
+    elif unit == 'm':
+         os.system(f"echo 'userdel -f {user}' | at now + {val} minutes")
+         msg_fin = f"Expire dans {val} Minutes."
 
-def step_renew_days(message, user):
-    try:
-        days = int(message.text)
-        os.system(f"chage -E $(date -d '+{days} days' +%Y-%m-%d) {user}")
-        bot.reply_to(message, f"✅ `{user}` prolongé de {days} jours.", parse_mode="Markdown", reply_markup=main_menu())
-    except:
-        bot.send_message(message.chat.id, "❌ Erreur.")
+    bot.send_message(message.chat.id, f"✅ Compte `{user}` mis à jour.\n{msg_fin}", parse_mode="Markdown", reply_markup=main_menu())
+
+# --- STEPS MODIFICATION ---
+def step_edit_name(message, old_user):
+    new_user = message.text
+    if new_user.lower() == "meme":
+        new_user = old_user
+    else:
+        # Renommer système
+        os.system(f"usermod -l {new_user} {old_user}")
+    
+    msg = bot.send_message(message.chat.id, f"User: `{new_user}`\n🔑 Entrez le **NOUVEAU PASS** (ou 'meme') :", parse_mode="Markdown")
+    bot.register_next_step_handler(msg, step_edit_pass, new_user)
+
+def step_edit_pass(message, user):
+    new_pass = message.text
+    final_pass = new_pass
+    if new_pass.lower() != "meme":
+        os.system(f"echo '{user}:{new_pass}' | chpasswd")
+    else:
+        final_pass = "**** (Inchangé)"
+    
+    msg = bot.send_message(message.chat.id, f"Pass: `{final_pass}`\n📅 Entrez la **NOUVELLE DURÉE** en jours (ou 'meme') :", parse_mode="Markdown")
+    bot.register_next_step_handler(msg, step_edit_final, user, final_pass)
+
+def step_edit_final(message, user, pwd):
+    days = message.text
+    if days.lower() != "meme":
+        try:
+             os.system(f"chage -E $(date -d '+{days} days' +%Y-%m-%d) {user}")
+             exp_msg = f"{days} Jours"
+        except:
+             exp_msg = "Erreur date"
+    else:
+        exp_msg = "Inchangée"
+    
+    if pwd == "**** (Inchangé)":
+        format_client = f"{VPS_IP}:1-65535@{user}:****"
+    else:
+        format_client = f"{VPS_IP}:1-65535@{user}:{pwd}"
+
+    decor = f"""
+━━━━━━━━━━━━━━━━━━
+✏️ **COMPTE MODIFIÉ**
+━━━━━━━━━━━━━━━━━━
+👤 **User :** `{user}`
+🔑 **Pass :** `{pwd}`
+📅 **Durée :** `{exp_msg}`
+🛡 **Port :** `1-65535`
+━━━━━━━━━━━━━━━━━━
+👇 **Nouveau Format :**
+`{format_client}`
+"""
+    bot.send_message(message.chat.id, decor, parse_mode="Markdown", reply_markup=main_menu())
 
 # --- LANCEMENT ---
 if __name__ == '__main__':
@@ -303,64 +470,28 @@ if __name__ == '__main__':
     bot.polling(non_stop=True)
 EOF
 
-  # Injection des variables BASH dans le fichier PYTHON
   sed -i "s/TOKEN_PLACEHOLDER/$token/g" /etc/UDPCustom/udp_bot.py
   sed -i "s/ADMIN_ID_PLACEHOLDER/$admin_id/g" /etc/UDPCustom/udp_bot.py
   sed -i "s/IP_PLACEHOLDER/$vps_ip/g" /etc/UDPCustom/udp_bot.py
 
-  # Création du service Bot (Systemd)
   cat <<EOF > /etc/systemd/system/udp-bot.service
 [Unit]
-Description=UDP Bot Pro V2
+Description=UDP Bot Pro V3
 After=network.target
-
 [Service]
 User=root
 WorkingDirectory=/etc/UDPCustom
 ExecStart=/usr/bin/python3 /etc/UDPCustom/udp_bot.py
 Restart=always
-
 [Install]
 WantedBy=multi-user.target
 EOF
 
-  # Création du script client automatique (One-Liner)
-  # Ce script est téléchargé par le client, il utilise les arguments user/pass
-  cat << 'EOF' > /etc/UDPCustom/udp.sh
-#!/bin/bash
-# Client Auto UDP
-ARG_USER=$1
-ARG_PASS=$2
-
-if [ -z "$ARG_USER" ]; then read -p "Username: " ARG_USER; fi
-if [ -z "$ARG_PASS" ]; then read -p "Password: " ARG_PASS; fi
-
-echo -e "\033[1;32mAuthentification pour $ARG_USER..."
-# Lancement du vrai installateur
-wget "https://raw.githubusercontent.com/toukamkojwojoel237/udp-custom/main/install.sh" -O inst.sh && chmod +x inst.sh && ./inst.sh
-# Note : L'installateur principal devra idéalement être adapté pour ne plus demander user/pass si on a déjà un compte,
-# mais ici ça permet de lancer l'installation proprement.
-EOF
-
-  # Serveur de fichier port 81 (Pour servir le script client)
-  cat <<EOF > /etc/systemd/system/udp-files.service
-[Unit]
-Description=File Server Port 81
-After=network.target
-[Service]
-ExecStart=/usr/bin/python3 -m http.server 81 --directory /etc/UDPCustom
-Restart=always
-[Install]
-WantedBy=multi-user.target
-EOF
-
-  # Démarrage des services
   systemctl daemon-reload
-  systemctl enable udp-bot udp-files
-  systemctl restart udp-bot udp-files
+  systemctl enable udp-bot
+  systemctl restart udp-bot
   
-  msg -verd " ✅ Bot V2 Installé avec succès !"
-  msg -verd " ⚠️  Assurez-vous que le port 81 est ouvert."
+  msg -verd " ✅ Bot V3 (Panel Complet) Installé !"
   enter
 }
 
@@ -376,7 +507,7 @@ online_pro() {
   enter
 }
 
-# 5. SYSTÈME DE LICENCE (Simulé pour le script)
+# 5. SYSTÈME DE LICENCE
 check_license() {
     if [[ -f "$LICENSE_FILE" ]]; then
         return 0
@@ -403,46 +534,13 @@ check_license() {
 #                  MENU PRINCIPAL
 # ==================================================
 udp() {
-    title "JOEL DATA - UDP MANAGER V8"
+    title "JOEL DATA - UDP MANAGER V9"
     
-    echo -e " \033[1;32m[1]\033[1;33m Créer Utilisateur (Manuel)"
+    # CMD PRO RESTAURÉES
+    echo -e " \033[1;32m[1]\033[1;33m Créer Utilisateur (SSH/UDP)"
     echo -e " \033[1;32m[2]\033[1;33m Supprimer Utilisateur"
     echo -e " \033[1;32m[3]\033[1;33m Renouveler Utilisateur"
     echo -e " \033[1;32m[4]\033[1;33m Liste des Utilisateurs"
     echo -e " \033[1;32m[5]\033[1;33m Infos VPS (Neofetch)"
     
-    if [[ -f "$LICENSE_FILE" ]]; then
-        msg -bar2
-        print_center -verd "--- OPTIONS PRO+ ---"
-        echo -e " \033[1;36m[6]\033[1;37m INSTALLER BOT TELEGRAM V2 🤖"
-        echo -e " \033[1;36m[7]\033[1;37m Voir Utilisateurs En Ligne 🟢"
-        echo -e " \033[1;31m[8]\033[1;37m Supprimer Licence"
-    else
-        msg -bar2
-        echo -e " \033[1;31m[6]\033[1;33m UDP CUSTOM PRO+ (Débloquer) 🔒"
-    fi
-
-    msg -bar
-    echo -e " \033[1;31m[0]\033[1;37m Quitter"
-    msg -bar
-    
-    read -p " Sélection : " selection
-    case $selection in
-        1) add_user ;;
-        2) remove_user ;;
-        3) renew_user ;;
-        4) list_users ;;
-        5) neofetch; enter ;;
-        6) 
-            if [[ -f "$LICENSE_FILE" ]]; then install_bot_pro; else check_license && install_bot_pro; fi ;;
-        7) 
-            if [[ -f "$LICENSE_FILE" ]]; then online_pro; else check_license && online_pro; fi ;;
-        8) 
-            if [[ -f "$LICENSE_FILE" ]]; then rm "$LICENSE_FILE"; menu; fi ;;
-            
-        0) exit 0 ;;
-        *) msg -verm "Option Invalide"; sleep 1; udp ;;
-    esac
-}
-
-udp
+    if [[ -f "$LICENSE_F
