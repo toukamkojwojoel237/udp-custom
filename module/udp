@@ -1,12 +1,12 @@
-her#!/bin/bash
+#!/bin/bash
 
 # Chargement du module graphique
 source /etc/UDPCustom/module
 
 # Configuration
 ADMIN_CONTACT="t.me/joeldata237"
-# URL de ton VPS Principal (Laisse ton IP ici)
-VERIFY_URL="http://76.13.8.245:5000/verify" 
+# NOUVELLE URL DU VPS PRINCIPAL (Central)
+VERIFY_URL="http://45.41.206.33:5000/verify" 
 LICENSE_FILE="/etc/udp_pro_active"
 
 # ==================================================
@@ -137,7 +137,7 @@ ADMIN_ID = "ADMIN_ID_PLACEHOLDER"
 VPS_IP = "IP_PLACEHOLDER"
 DB_PATH = "/etc/UDPCustom/bot_data.db"
 PORT_API = 5000
-ITEMS_PER_PAGE = 6  # Nombre d'utilisateurs par page
+ITEMS_PER_PAGE = 6
 # ---------------------
 
 bot = telebot.TeleBot(TOKEN)
@@ -276,8 +276,6 @@ def callback_query(call):
         except: page = 0
         
         users = get_users_list()
-        
-        # Pagination Logique
         start = page * ITEMS_PER_PAGE
         end = start + ITEMS_PER_PAGE
         current_users = users[start:end]
@@ -290,7 +288,6 @@ def callback_query(call):
             for u in current_users:
                 markup.add(types.InlineKeyboardButton(f"👤 {u}", callback_data=f"view_user:{u}"))
         
-        # Boutons Navigation
         nav_btns = []
         if page > 0:
             nav_btns.append(types.InlineKeyboardButton("⬅️ Préc", callback_data=f"list_menu:{page-1}"))
@@ -384,7 +381,6 @@ def callback_query(call):
         bot.send_message(call.message.chat.id, "Menu :", reply_markup=main_menu())
 
     # === AUTRES (Supprimer, Renouveler, Modifier, Infos) ===
-    # (Je garde les autres fonctions mais avec le bouton retour accueil)
     
     elif call.data == "del_menu":
         users = get_users_list()
@@ -532,10 +528,10 @@ PYTHON_MARKER
   sed -i "s/ADMIN_ID_PLACEHOLDER/$admin_id/g" /etc/UDPCustom/udp_bot.py
   sed -i "s/IP_PLACEHOLDER/$vps_ip/g" /etc/UDPCustom/udp_bot.py
 
-  # Création du service
+   # Création du service
   cat << 'SERVICE_MARKER' > /etc/systemd/system/udp-bot.service
 [Unit]
-Description=UDP Bot Central V5
+Description=UDP Bot Central
 After=network.target
 [Service]
 User=root
@@ -550,7 +546,7 @@ SERVICE_MARKER
   systemctl enable udp-bot
   systemctl restart udp-bot
   
-  msg -verd " ✅ Bot Central (Design Pro & Pagination) Installé !"
+  msg -verd " ✅ Bot Central Installé !"
   enter
 }
 
@@ -566,28 +562,49 @@ online_pro() {
   enter
 }
 
-# 5. SYSTÈME DE LICENCE (DISTANT)
+# 5. SYSTÈME DE LICENCE (DISTANT & RÉVOCABLE)
 check_license() {
+    # Si le fichier existe, on vérifie en arrière-plan si la clé est toujours valide.
     if [[ -f "$LICENSE_FILE" ]]; then
-        return 0
+        key=$(cat "$LICENSE_FILE")
+        res=$(curl -s --max-time 5 "$VERIFY_URL?key=$key")
+        
+        # Si le serveur répond que c'est invalide ou expiré
+        if [[ "$res" == "INVALID_KEY" || "$res" == "EXPIRED_OR_BANNED" || "$res" == "LIMIT_REACHED" ]]; then
+            rm -f "$LICENSE_FILE"
+            msg -verm " ❌ Licence Révoquée ou Expirée par l'Administrateur."
+            sleep 2
+            return 1
+        fi
+        return 0 # Toujours valide ou serveur temporairement inaccessible
     fi
+    
+    # Si pas de licence
     title "🔒 UDP CUSTOM PRO+"
     msg -verm " Cette section est verrouillée."
-    msg -ama " Contactez @joeldata237 pour le code."
+    msg -ama " Contactez @joeldata237 pour acheter une clé."
     msg -bar
-    msg -ne " Entrez le Code : " && read key
+    msg -ne " Entrez votre Clé Premium : " && read key
     
-    # Vérification réelle via l'API du VPS Principal
     msg -azu " Vérification sur le serveur central..."
-    res=$(curl -s "$VERIFY_URL?key=$key")
+    res=$(curl -s --max-time 10 "$VERIFY_URL?key=$key")
     
     if [[ "$res" == "VALID" ]]; then
         msg -verd " ✅ CODE VALIDE ! Bienvenue."
-        touch "$LICENSE_FILE"
+        # On sauvegarde LA CLÉ dans le fichier
+        echo "$key" > "$LICENSE_FILE"
         sleep 2
         return 0
+    elif [[ "$res" == "LIMIT_REACHED" ]]; then
+        msg -verm " ❌ Cette clé a atteint sa limite de VPS autorisés."
+        sleep 3
+        return 1
+    elif [[ "$res" == "INVALID_KEY" || "$res" == "EXPIRED_OR_BANNED" ]]; then
+        msg -verm " ❌ Code Invalide ou Expiré."
+        sleep 2
+        return 1
     else
-        msg -verm " ❌ Code Invalide (ou Serveur injoignable)."
+        msg -verm " ❌ Serveur Central Injoignable."
         sleep 2
         return 1
     fi
@@ -608,7 +625,7 @@ udp() {
     if [[ -f "$LICENSE_FILE" ]]; then
         msg -bar2
         print_center -verd "--- OPTIONS PRO+ ---"
-        echo -e " \033[1;36m[6]\033[1;37m INSTALLER BOT TELEGRAM V5 🤖"
+        echo -e " \033[1;36m[6]\033[1;37m INSTALLER BOT TELEGRAM 🤖"
         echo -e " \033[1;36m[7]\033[1;37m Voir Utilisateurs En Ligne 🟢"
         echo -e " \033[1;31m[8]\033[1;37m Supprimer Licence"
     else
